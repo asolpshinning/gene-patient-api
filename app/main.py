@@ -1,15 +1,29 @@
+import time
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, OperationalError
 from . import models, database
 from .services.fhir_service import FHIRService
 from sqlalchemy import or_
+from datetime import datetime
 
 app = FastAPI()
 
 # Create tables
+def wait_for_db(max_retries=5, retry_interval=5):
+    for i in range(max_retries):
+        try:
+            # Try to create tables
+            models.Base.metadata.create_all(bind=database.engine)
+            return
+        except OperationalError as e:
+            if i == max_retries - 1:  # Last retry
+                raise e
+            print(f"Database not ready, waiting {retry_interval} seconds... (Attempt {i+1}/{max_retries})")
+            time.sleep(retry_interval)
+
 try:
-    models.Base.metadata.create_all(bind=database.engine)
+    wait_for_db()
 except SQLAlchemyError as e:
     print(f"Failed to create database tables: {str(e)}")
     raise
@@ -113,3 +127,12 @@ async def get_patient_observations(patient_id: str, db: Session = Depends(databa
             status_code=500,
             detail=f"Database error: {str(e)}"
         )
+
+@app.get("/")
+def health_check():
+    return {
+        "status": "healthy",
+        "version": "1.0.0",  # You can add version info
+        "database": "connected" if database.engine else "disconnected",
+        "timestamp": datetime.utcnow().isoformat()
+    }

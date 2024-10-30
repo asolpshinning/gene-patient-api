@@ -8,11 +8,61 @@ python3 -m venv venv
 source venv/bin/activate
 
 # Install packages
-pip install sqlalchemy psycopg2-binary python-dotenv
+pip install sqlalchemy psycopg2-binary python-dotenv fastapi uvicorn
 
 # Save all dependencies to requirements.txt
 pip freeze > requirements.txt
 ```
+
+
+### Docker Useful Commands
+
+1. Remove existing docker-compose (if outdated):
+```bash
+sudo rm /usr/bin/docker-compose
+```
+
+2. Install the latest version of Docker Compose:
+```bash
+# Download the latest version of Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+# Make it executable
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Create a symbolic link
+sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+```
+
+3. Verify the installation:
+```bash
+docker-compose --version
+```
+
+4. Check your Docker configuration:
+```bash
+# Check Docker version
+docker version
+
+# Check Docker info
+docker info
+```
+
+5. Now run your containers for both the backend and the database:
+```bash
+docker-compose up
+```
+
+6. To stop any running containers:
+```bash
+docker-compose down -v
+```
+
+7. To rebuild and start the containers:
+```bash
+docker-compose up --build
+```
+
 
 
 ### Some Research Notes
