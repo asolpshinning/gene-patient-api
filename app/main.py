@@ -10,7 +10,7 @@ from datetime import datetime
 
 app = FastAPI()
 
-# Create tables
+# Function to wait for the database to be ready and create tables
 def wait_for_db(max_retries=5, retry_interval=5):
     for i in range(max_retries):
         try:
@@ -23,11 +23,13 @@ def wait_for_db(max_retries=5, retry_interval=5):
             print(f"Database not ready, waiting {retry_interval} seconds... (Attempt {i+1}/{max_retries})")
             time.sleep(retry_interval)
 
-try:
-    wait_for_db()
-except SQLAlchemyError as e:
-    print(f"Failed to create database tables: {str(e)}")
-    raise
+@app.on_event("startup")
+def startup_event():
+    try:
+        wait_for_db()
+    except SQLAlchemyError as e:
+        print(f"Failed to create database tables: {str(e)}")
+        raise
 
 @app.post("/populate/{postal_code}")
 async def populate_data(postal_code: str, db: Session = Depends(database.get_db)):
