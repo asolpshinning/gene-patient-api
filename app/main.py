@@ -1,4 +1,5 @@
 import time
+import traceback
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, OperationalError
@@ -78,11 +79,16 @@ async def populate_data(postal_code: str, db: Session = Depends(database.get_db)
         return {"message": "Data populated successfully"}
         
     except Exception as e:
+        # Add detailed error logging
+        print(f"Error in populate_data: {str(e)}")
+        print("Traceback:")
+        print(traceback.format_exc())
+        
         # Ensure database session is rolled back
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=f"Error: {str(e)}"
         )
 
 @app.get("/patients/{search_term}")

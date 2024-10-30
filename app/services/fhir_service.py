@@ -2,23 +2,35 @@ import requests
 from datetime import datetime
 from requests.exceptions import HTTPError, ConnectionError, Timeout, JSONDecodeError
 from typing import Dict, Any, Optional
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 class FHIRService:
     BASE_URL = "https://hapi.fhir.org/baseR5"
 
-    @staticmethod
-    def get_patients_by_postal_code(postal_code: str) -> Dict[str, Any]:
+    def __init__(self):
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,  # number of retries
+            backoff_factor=1,  # wait 1, 2, 4 seconds between retries
+            status_forcelist=[500, 502, 503, 504]  # HTTP status codes to retry on
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+
+    def get_patients_by_postal_code(self, postal_code: str) -> Dict[str, Any]:
         try:
-            response = requests.get(
-                f"{FHIRService.BASE_URL}/Patient?address-postalcode={postal_code}",
-                timeout=10
+            response = self.session.get(
+                f"{self.BASE_URL}/Patient?address-postalcode={postal_code}",
+                timeout=30  # increased timeout to 30 seconds
             )
             response.raise_for_status()
             return response.json()
         except Timeout:
-            raise Exception("FHIR server request timed out")
+            raise Exception("FHIR server request timed out after 30 seconds")
         except ConnectionError:
-            raise Exception("Failed to connect to FHIR server")
+            raise Exception("Failed to connect to FHIR server. Please check your network connection")
         except HTTPError as e:
             raise Exception(f"FHIR server returned an error: {e.response.status_code}")
         except JSONDecodeError:
