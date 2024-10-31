@@ -2,8 +2,21 @@ import pytest
 from app.models import Patient, Observation
 from sqlalchemy import select
 from unittest.mock import patch
+from app.auth import create_access_token
 
 pytestmark = pytest.mark.asyncio
+
+@pytest.fixture
+def test_token():
+    return create_access_token({"sub": "admin"})
+
+@pytest.fixture
+def authorized_client(client, test_token):
+    client.headers = {
+        "Authorization": f"Bearer {test_token}",
+        **client.headers
+    }
+    return client
 
 class TestEndpoints:
     async def test_health_check(self, client):
@@ -63,7 +76,7 @@ class TestEndpoints:
         assert len(data) == 1
         assert data[0]["id"] == "obs123"
 
-    async def test_populate_data(self, client, test_db):
+    async def test_populate_data(self, authorized_client, test_db):
         postal_code = "12345"
         mock_patient_data = {
             "entry": [
@@ -82,7 +95,7 @@ class TestEndpoints:
         with patch('app.services.fhir_service.FHIRService.get_patients_by_postal_code') as mock_get_patients:
             mock_get_patients.return_value = mock_patient_data
             
-            response = await client.post(f"/populate/{postal_code}")
+            response = await authorized_client.post(f"/populate/{postal_code}")
             assert response.status_code == 200
             data = response.json()
             assert data["message"] == "Data populated successfully"
@@ -94,3 +107,17 @@ class TestEndpoints:
             patients = result.scalars().all()
             assert len(patients) == 1
             assert patients[0].id == "test789"
+
+    async def test_login(self, client):
+        response = await client.post(
+            "/token",
+            data={"username": "admin", "password": "admin"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+
+    async def test_unauthorized_access(self, client, test_db):
+        response = await client.post("/populate/12345")
+        assert response.status_code == 401

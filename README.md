@@ -1,6 +1,15 @@
 # FHIR Patient Data Service
 
-A FastAPI-based service for managing patient data using the FHIR standard.
+A FastAPI-based service for managing patient data using the FHIR standard. This service provides endpoints for storing and retrieving patient information and their medical observations.
+
+## Features
+- FHIR R5 Integration
+- Async Database Operations
+- JWT Authentication
+- Health Check Endpoints
+- Patient Data Management
+- Observation Tracking
+- Postal Code Based Search
 
 ## Setup and Installation
 
@@ -21,10 +30,10 @@ python3 -m venv venv
 # Activate the virtual environment (for Linux/MacOS)
 source venv/bin/activate
 
-# Install packages
-pip install sqlalchemy psycopg2-binary python-dotenv fastapi uvicorn
+# Install dependencies
+pip install -r requirements.txt
 
-# Save all dependencies to requirements.txt
+# Save all dependencies to requirements.txt if more packages are installed
 pip freeze > requirements.txt
 ```
 
@@ -61,21 +70,34 @@ docker version
 docker info
 ```
 
-5. Now run your containers for both the backend and the database:
-```bash
-docker-compose up
-```
 
-6. To stop any running containers:
+5. To stop any running containers:
 ```bash
 docker-compose down -v
 ```
 
-7. To rebuild and start the containers:
+6. To rebuild and start the containers:
 ```bash
 docker-compose up --build
 ```
 
+## Authentication
+
+The service uses JWT-based authentication for protected endpoints. To obtain a token:
+
+1. Make a POST request to `/token` with:
+```json
+{
+    "username": "admin",
+    "password": "admin"
+}
+```
+
+2. Use the returned token in subsequent requests:
+```bash
+Authorization: Bearer <your_token>
+```
+    
 ## API Documentation
 
 ### Health Check
@@ -173,7 +195,18 @@ The `entry` array in the Bundle contains the matching resources, and each entry 
 
 > Within the results bundle, there are three types of entries that MAY be present, identified by the search mode of the entry: `match`, `include`, or `outcome`.
 
-The structure follows the standard FHIR Bundle format:
+So when we check `patients_data.get("entry")`, we're verifying that the search returned some matching results (if there are no matches, the `entry` array would be empty or missing).
+
+This is why the code raises a 404 error if no `entry` is found:
+```python:app/main.py
+if not patients_data.get("entry"):
+    raise HTTPException(
+        status_code=404,
+        detail=f"No patients found for postal code {postal_code}"
+    )
+```
+
+The structure follows the standard FHIR Bundle format, which looks like:
 ```json
 {
     "resourceType": "Bundle",

@@ -10,6 +10,10 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from contextlib import asynccontextmanager
+from fastapi.security import OAuth2PasswordRequestForm
+from .auth import authenticate_user, create_access_token, get_current_user
+from datetime import timedelta
+from fastapi import status
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,8 +43,27 @@ def wait_for_db(max_retries=5, retry_interval=5):
             print(f"Database not ready, waiting {retry_interval} seconds... (Attempt {i+1}/{max_retries})")
             time.sleep(retry_interval)
 
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(
+        data={"sub": user["username"]},
+        expires_delta=timedelta(minutes=30)
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 @app.post("/populate/{postal_code}")
-async def populate_data(postal_code: str, db: AsyncSession = Depends(database.get_db)):
+async def populate_data(
+    postal_code: str,
+    db: AsyncSession = Depends(database.get_db),
+    current_user: dict = Depends(get_current_user)
+):
     try:
         fhir_service = FHIRService()
         
