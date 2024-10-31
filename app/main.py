@@ -43,12 +43,15 @@ async def populate_data(postal_code: str, db: Session = Depends(database.get_db)
             raise HTTPException(
                 status_code=404,
                 detail=f"No patients found for postal code {postal_code}"
-            )
+            ) from None
 
         for entry in patients_data.get("entry", []):
             try:
                 patient_data = entry.get("resource", {})
                 patient_dict = fhir_service.parse_patient(patient_data)
+                
+                # Set the postal code from our search parameter
+                patient_dict["postal_code"] = postal_code
                 
                 # Create patient
                 patient = models.Patient(**patient_dict)
@@ -80,13 +83,16 @@ async def populate_data(postal_code: str, db: Session = Depends(database.get_db)
             
         return {"message": "Data populated successfully"}
         
+    except HTTPException as he:
+        # Add specific handling for HTTPException to preserve status code
+        db.rollback()
+        raise he
     except Exception as e:
-        # Add detailed error logging
+        # Handle other exceptions as 500 Internal Server Error
         print(f"Error in populate_data: {str(e)}")
         print("Traceback:")
         print(traceback.format_exc())
         
-        # Ensure database session is rolled back
         db.rollback()
         raise HTTPException(
             status_code=500,
@@ -129,6 +135,29 @@ async def get_patient_observations(patient_id: str, db: Session = Depends(databa
                 detail=f"No observations found for patient ID: {patient_id}"
             )
         return observations
+        
+    except SQLAlchemyError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+
+@app.get("/patients/postal_code/{postal_code}")
+async def get_patients_by_postal_code(postal_code: str, db: Session = Depends(database.get_db)):
+    try:
+        patients = db.query(models.Patient.id).filter(
+            models.Patient.postal_code == postal_code
+        ).all()
+        
+        if not patients:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No patients found for postal code: {postal_code}"
+            )
+            
+        # Convert list of tuples to list of IDs
+        patient_ids = [patient[0] for patient in patients]
+        return {"patient_ids": patient_ids}
         
     except SQLAlchemyError as e:
         raise HTTPException(

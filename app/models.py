@@ -9,6 +9,7 @@ class Patient(Base):
     first_name = Column(String)
     gender = Column(String)
     birth_date = Column(Date)
+    postal_code = Column(String)
     observations = relationship("Observation", back_populates="patient")
 
 class Observation(Base):
